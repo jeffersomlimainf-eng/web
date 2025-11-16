@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetriz Clássico</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont,
+          'Helvetica Neue', sans-serif;
+        background: radial-gradient(circle at top, #2e2a47, #0b0b13);
+        min-height: 100%;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f7f4ff;
+      }
+
+      .app {
+        display: flex;
+        gap: 2.5rem;
+        width: min(100%, 960px);
+        padding: 2rem;
+      }
+
+      canvas {
+        background: rgba(5, 7, 20, 0.9);
+        border-radius: 12px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+        border: 2px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .painel {
+        max-width: 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      h1 {
+        font-size: 2.4rem;
+        margin: 0;
+      }
+
+      p {
+        margin: 0;
+        line-height: 1.5;
+        color: #ccc7ff;
+      }
+
+      .pontuacao {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+      }
+
+      .pontuacao div {
+        padding: 1rem;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .pontuacao span {
+        display: block;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #aca4ff;
+      }
+
+      .pontuacao strong {
+        font-size: 2rem;
+      }
+
+      .preview {
+        margin-top: 0.5rem;
+        padding: 1rem;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .preview span {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #aca4ff;
+      }
+
+      .preview canvas {
+        width: 120px;
+        height: 120px;
+        border-radius: 12px;
+        background: rgba(5, 7, 20, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 10px 25px rgba(0, 0, 0, 0.35);
+      }
+
+      button {
+        background: #ff517a;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 999px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(255, 81, 122, 0.3);
+      }
+
+      @media (max-width: 820px) {
+        .app {
+          flex-direction: column-reverse;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="painel">
+        <h1>Tetriz</h1>
+        <p>
+          Use as setas para mover e girar as peças. Pressione barra de espaço
+          para queda rápida. Complete linhas para marcar pontos e mantenha o
+          tabuleiro limpo!
+        </p>
+        <div class="pontuacao">
+          <div><span>Pontos</span><strong id="pontos">0</strong></div>
+          <div><span>Linhas</span><strong id="linhas">0</strong></div>
+          <div><span>Nível</span><strong id="nivel">1</strong></div>
+        </div>
+        <div class="preview">
+          <span>Próxima peça</span>
+          <canvas
+            id="proximo"
+            width="120"
+            height="120"
+            aria-label="Prévia da próxima peça"
+          ></canvas>
+        </div>
+        <button id="reiniciar">Reiniciar</button>
+      </section>
+      <canvas
+        id="tabuleiro"
+        width="300"
+        height="600"
+        aria-label="Tabuleiro do jogo"
+      ></canvas>
+    </main>
+    <script>
+      const COLUNAS = 10;
+      const LINHAS = 20;
+      const TAMANHO = 30;
+      const CORES = {
+        I: '#35c3ff',
+        J: '#6b5b95',
+        L: '#ffba49',
+        O: '#ffd166',
+        S: '#06d6a0',
+        T: '#bd63f9',
+        Z: '#ef476f',
+      };
+
+      const LARGURA_CANVAS = COLUNAS * TAMANHO;
+      const ALTURA_CANVAS = LINHAS * TAMANHO;
+
+      const canvas = document.getElementById('tabuleiro');
+      if (!canvas) {
+        throw new Error('Canvas do tabuleiro não encontrado no documento.');
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Não foi possível inicializar o contexto 2D do canvas.');
+      }
+
+      const previewCanvas = document.getElementById('proximo');
+      if (!previewCanvas) {
+        throw new Error('Canvas de pré-visualização não encontrado.');
+      }
+      const previewCtx = previewCanvas.getContext('2d');
+      if (!previewCtx) {
+        throw new Error('Não foi possível inicializar o contexto do preview.');
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = LARGURA_CANVAS * dpr;
+      canvas.height = ALTURA_CANVAS * dpr;
+      canvas.style.width = `${LARGURA_CANVAS}px`;
+      canvas.style.height = `${ALTURA_CANVAS}px`;
+      ctx.scale(dpr, dpr);
+
+      const PREVIEW_COLS = 4;
+      const PREVIEW_ROWS = 4;
+      const PREVIEW_SIZE = 28;
+      previewCanvas.width = PREVIEW_COLS * PREVIEW_SIZE * dpr;
+      previewCanvas.height = PREVIEW_ROWS * PREVIEW_SIZE * dpr;
+      previewCanvas.style.width = `${PREVIEW_COLS * PREVIEW_SIZE}px`;
+      previewCanvas.style.height = `${PREVIEW_ROWS * PREVIEW_SIZE}px`;
+      previewCtx.scale(dpr, dpr);
+
+      const pontosEl = document.getElementById('pontos');
+      const linhasEl = document.getElementById('linhas');
+      const nivelEl = document.getElementById('nivel');
+      const btnReiniciar = document.getElementById('reiniciar');
+
+      const estado = {
+        matriz: criarMatriz(COLUNAS, LINHAS),
+        pecaAtual: null,
+        proximoTipo: gerarTipo(),
+        pontos: 0,
+        linhas: 0,
+        nivel: 1,
+        queda: 1000,
+        ultimaAtualizacao: 0,
+        contadorQueda: 0,
+        ativo: true,
+      };
+
+      const TECLAS_CONTROLE = new Set([
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowDown',
+        'ArrowUp',
+        'Space',
+      ]);
+
+      function criarMatriz(largura, altura) {
+        return Array.from({ length: altura }, () => Array(largura).fill(0));
+      }
+
+      function gerarTipo() {
+        const tipos = Object.keys(CORES);
+        return tipos[(tipos.length * Math.random()) | 0];
+      }
+
+      function criarPeca(tipo) {
+        switch (tipo) {
+          case 'T':
+            return [
+              [0, tipo, 0],
+              [tipo, tipo, tipo],
+            ];
+          case 'O':
+            return [
+              [tipo, tipo],
+              [tipo, tipo],
+            ];
+          case 'L':
+            return [
+              [0, 0, tipo],
+              [tipo, tipo, tipo],
+            ];
+          case 'J':
+            return [
+              [tipo, 0, 0],
+              [tipo, tipo, tipo],
+            ];
+          case 'I':
+            return [[tipo, tipo, tipo, tipo]];
+          case 'S':
+            return [
+              [0, tipo, tipo],
+              [tipo, tipo, 0],
+            ];
+          case 'Z':
+            return [
+              [tipo, tipo, 0],
+              [0, tipo, tipo],
+            ];
+          default:
+            return [];
+        }
+      }
+
+      function desenharMatriz(matriz, offset) {
+        matriz.forEach((linha, y) => {
+          linha.forEach((valor, x) => {
+            if (valor !== 0) {
+              ctx.fillStyle = CORES[valor];
+              ctx.fillRect(
+                (x + offset.x) * TAMANHO,
+                (y + offset.y) * TAMANHO,
+                TAMANHO,
+                TAMANHO,
+              );
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+              ctx.strokeRect(
+                (x + offset.x) * TAMANHO,
+                (y + offset.y) * TAMANHO,
+                TAMANHO,
+                TAMANHO,
+              );
+            }
+          });
+        });
+      }
+
+      function colide(matriz, peca) {
+        for (let y = 0; y < peca.matriz.length; y += 1) {
+          for (let x = 0; x < peca.matriz[y].length; x += 1) {
+            if (
+              peca.matriz[y][x] !== 0 &&
+              (estado.matriz[y + peca.pos.y] &&
+                estado.matriz[y + peca.pos.y][x + peca.pos.x]) !== 0
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function mesclar() {
+        estado.pecaAtual.matriz.forEach((linha, y) => {
+          linha.forEach((valor, x) => {
+            if (valor !== 0) {
+              estado.matriz[y + estado.pecaAtual.pos.y][x + estado.pecaAtual.pos.x] = valor;
+            }
+          });
+        });
+      }
+
+      function limparLinhas() {
+        let linhasCompletas = 0;
+        outer: for (let y = estado.matriz.length - 1; y >= 0; y -= 1) {
+          for (let x = 0; x < estado.matriz[y].length; x += 1) {
+            if (estado.matriz[y][x] === 0) {
+              continue outer;
+            }
+          }
+          const linha = estado.matriz.splice(y, 1)[0].fill(0);
+          estado.matriz.unshift(linha);
+          linhasCompletas += 1;
+          y += 1;
+        }
+
+        if (linhasCompletas > 0) {
+          const pontosBase = [0, 100, 300, 500, 800];
+          estado.pontos += pontosBase[linhasCompletas] * estado.nivel;
+          estado.linhas += linhasCompletas;
+          estado.nivel = Math.floor(estado.linhas / 10) + 1;
+          estado.queda = Math.max(150, 1000 - (estado.nivel - 1) * 75);
+        }
+      }
+
+      function desenhar() {
+        ctx.fillStyle = '#050714';
+        ctx.fillRect(0, 0, LARGURA_CANVAS, ALTURA_CANVAS);
+        desenharMatriz(estado.matriz, { x: 0, y: 0 });
+        if (estado.pecaAtual) {
+          desenharMatriz(estado.pecaAtual.matriz, estado.pecaAtual.pos);
+        }
+      }
+
+      function desenharPreview() {
+        previewCtx.fillStyle = '#050714';
+        previewCtx.fillRect(0, 0, PREVIEW_COLS * PREVIEW_SIZE, PREVIEW_ROWS * PREVIEW_SIZE);
+        const matriz = criarPeca(estado.proximoTipo);
+        const offsetX = Math.floor((PREVIEW_COLS - (matriz[0]?.length || 0)) / 2);
+        const offsetY = Math.floor((PREVIEW_ROWS - matriz.length) / 2);
+        matriz.forEach((linha, y) => {
+          linha.forEach((valor, x) => {
+            if (valor) {
+              previewCtx.fillStyle = CORES[valor];
+              previewCtx.fillRect(
+                (x + offsetX) * PREVIEW_SIZE,
+                (y + offsetY) * PREVIEW_SIZE,
+                PREVIEW_SIZE,
+                PREVIEW_SIZE,
+              );
+              previewCtx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+              previewCtx.strokeRect(
+                (x + offsetX) * PREVIEW_SIZE,
+                (y + offsetY) * PREVIEW_SIZE,
+                PREVIEW_SIZE,
+                PREVIEW_SIZE,
+              );
+            }
+          });
+        });
+      }
+
+      function girar(matriz) {
+        const altura = matriz.length;
+        const largura = Math.max(...matriz.map((linha) => linha.length));
+
+        const normalizada = matriz.map((linha) => {
+          if (linha.length === largura) {
+            return linha.slice();
+          }
+          return [...linha, ...Array(largura - linha.length).fill(0)];
+        });
+
+        const resultado = Array.from({ length: largura }, () => Array(altura).fill(0));
+
+        for (let y = 0; y < altura; y += 1) {
+          for (let x = 0; x < largura; x += 1) {
+            resultado[x][altura - 1 - y] = normalizada[y][x];
+          }
+        }
+
+        return resultado;
+      }
+
+      function mover(offsetX) {
+        estado.pecaAtual.pos.x += offsetX;
+        if (colide(estado.matriz, estado.pecaAtual)) {
+          estado.pecaAtual.pos.x -= offsetX;
+        }
+      }
+
+      function cair() {
+        estado.pecaAtual.pos.y += 1;
+        if (colide(estado.matriz, estado.pecaAtual)) {
+          estado.pecaAtual.pos.y -= 1;
+          mesclar();
+          limparLinhas();
+          atualizarPainel();
+          novaPeca();
+        }
+        estado.contadorQueda = 0;
+      }
+
+      function quedaRapida() {
+        do {
+          estado.pecaAtual.pos.y += 1;
+        } while (!colide(estado.matriz, estado.pecaAtual));
+        estado.pecaAtual.pos.y -= 1;
+        mesclar();
+        limparLinhas();
+        atualizarPainel();
+        novaPeca();
+      }
+
+      function atualizarPainel() {
+        pontosEl.textContent = estado.pontos;
+        linhasEl.textContent = estado.linhas;
+        nivelEl.textContent = estado.nivel;
+      }
+
+      function novaPeca() {
+        const tipo = estado.proximoTipo;
+        estado.proximoTipo = gerarTipo();
+        estado.pecaAtual = {
+          matriz: criarPeca(tipo),
+          pos: { x: Math.floor(COLUNAS / 2) - 1, y: 0 },
+        };
+        desenharPreview();
+        if (colide(estado.matriz, estado.pecaAtual)) {
+          estado.ativo = false;
+          alert('Fim de jogo! Pontuação: ' + estado.pontos);
+        }
+      }
+
+      function atualizar(tempo = 0) {
+        const delta =
+          estado.ultimaAtualizacao === 0 ? 0 : tempo - estado.ultimaAtualizacao;
+        estado.ultimaAtualizacao = tempo;
+
+        if (estado.ativo && estado.pecaAtual) {
+          estado.contadorQueda += delta;
+          if (estado.contadorQueda >= estado.queda) {
+            cair();
+          }
+        }
+
+        desenhar();
+        requestAnimationFrame(atualizar);
+      }
+
+      function girarAtual() {
+        const matrizOriginal = estado.pecaAtual.matriz;
+        const girada = girar(matrizOriginal);
+        estado.pecaAtual.matriz = girada;
+        if (colide(estado.matriz, estado.pecaAtual)) {
+          estado.pecaAtual.pos.x += 1;
+          if (colide(estado.matriz, estado.pecaAtual)) {
+            estado.pecaAtual.pos.x -= 2;
+            if (colide(estado.matriz, estado.pecaAtual)) {
+              estado.pecaAtual.pos.x += 1;
+              estado.pecaAtual.matriz = matrizOriginal;
+              return;
+            }
+          }
+        }
+      }
+
+      function reiniciar() {
+        estado.matriz = criarMatriz(COLUNAS, LINHAS);
+        estado.pontos = 0;
+        estado.linhas = 0;
+        estado.nivel = 1;
+        estado.queda = 1000;
+        estado.ativo = true;
+        estado.proximoTipo = gerarTipo();
+        estado.ultimaAtualizacao = 0;
+        estado.contadorQueda = 0;
+        novaPeca();
+        atualizarPainel();
+      }
+
+      btnReiniciar.addEventListener('click', () => {
+        reiniciar();
+      });
+
+      document.addEventListener('keydown', (evento) => {
+        if (TECLAS_CONTROLE.has(evento.code)) {
+          evento.preventDefault();
+        }
+        if (!estado.ativo) return;
+        switch (evento.code) {
+          case 'ArrowLeft':
+            mover(-1);
+            break;
+          case 'ArrowRight':
+            mover(1);
+            break;
+          case 'ArrowDown':
+            cair();
+            break;
+          case 'ArrowUp':
+            girarAtual();
+            break;
+          case 'Space':
+            quedaRapida();
+            break;
+        }
+      });
+
+      reiniciar();
+      requestAnimationFrame(atualizar);
+    </script>
+  </body>
+</html>
