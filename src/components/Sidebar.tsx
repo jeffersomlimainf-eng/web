@@ -247,7 +247,7 @@ export default function Sidebar({
             )}
 
             <div className={clsx(
-                "w-64 h-full bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col transition-transform duration-300 ease-in-out relative z-50",
+                "w-64 h-full bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col transition-transform duration-300 ease-in-out z-50",
                 "fixed inset-y-0 left-0 md:relative md:translate-x-0",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
