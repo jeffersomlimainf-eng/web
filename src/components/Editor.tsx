@@ -98,7 +98,7 @@ export default function Editor({ noteId, onTitleChange }: EditorProps) {
 
     return (
         <div className="flex-1 h-full flex flex-col bg-white dark:bg-gray-950 transition-colors duration-200">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center transition-colors">
+            <div className="p-6 pl-16 md:pl-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center transition-colors">
                 <input
                     type="text"
                     value={title}
